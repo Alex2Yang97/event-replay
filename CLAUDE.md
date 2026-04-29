@@ -22,13 +22,13 @@ The core insight: TipRanks/Bloomberg/TradingView already win on dashboards. Nobo
 
 ## What's in scope for V1 (the weekend MVP)
 
-- Single input: ticker (US equities only) + datetime picker (regular hours only)
-- Pull ±2h of 1-min bars + nearby news headlines
+- Single input: ticker (US equities only) + datetime picker (regular hours only, **last 30 days only** — yahoo-finance2 1-min hard cliff per `feasibility/VERDICT.md`)
+- Pull ±2h of 1-min bars + nearby news headlines (both via `yahoo-finance2`)
 - One Anthropic call → `{event_summary, bull_take, bear_take}` with required source citations
 - Render annotated chart + 3 cards + financial-advice disclaimer
 - Generate `sha1(ticker + rounded_minute_ET)` permalink, store in Vercel KV
 - Static OG image (no chart in OG — Lightweight Charts is canvas-runtime, not SSR)
-- Hardcoded array of 5 demo replays in footer
+- Hardcoded array of 5 demo replays in footer (all must be ≤30 days old)
 
 ## What's explicitly out of V1
 
@@ -39,17 +39,17 @@ The core insight: TipRanks/Bloomberg/TradingView already win on dashboards. Nobo
 - Fact-check pass on LLM output (V1 risk accepted, mitigated by disclaimer)
 - Curated event feed (Approach B — for next iteration if A validates)
 
-## Stack (committed)
+## Stack (committed — feasibility-validated 2026-04-29)
 
 - Next.js 15 App Router on Vercel
 - Tailwind v4 + shadcn/ui
 - Lightweight Charts (TradingView OSS) for K-line rendering
-- Polygon.io Starter ($30/mo, includes news endpoint)
+- **`yahoo-finance2` (Node)** for both 1-min OHLC AND news headlines — single load-bearing dep, free, no API key. Plan B if it breaks: Polygon Starter ($30/mo, ~2h migration)
 - Anthropic SDK, Claude Sonnet 4.7
 - Vercel KV for permalink storage (no price caching in V1)
 - `@vercel/og` for static OG images
 
-Budget cap: **≤$50 first month total**. Anthropic monthly hard cap = $20.
+Budget cap: **≤$30 first month total** (revised down from $50 after free data source confirmed). Anthropic monthly hard cap = $20.
 
 ## The user (project owner)
 
@@ -59,7 +59,7 @@ The 5 friends haven't been named yet — that's a Day-0 task.
 
 ## The two-track assignment for the first week
 
-1. **Ship Approach A V1** — Day 1 starts with a 30-minute Feasibility check on the data source (yfinance vs Polygon Starter). Plan B is paying $30/mo. Don't write anything else until you've validated 1-min intraday data is available.
+1. **Ship Approach A V1** — ~~Day 1 first 30-min feasibility check~~ DONE 2026-04-29 (PASS via `yahoo-finance2`, see `feasibility/VERDICT.md`). Resume from Day 1 main work: Next.js skeleton + input form (with 30-day max constraint) + `/api/replay` route + Lightweight Charts.
 2. **Interview ≥3 of the 5 friends** — 30 minutes each. One open question: "Last time you wanted to understand a market move — what was it, and what did you actually do?" Write down their words verbatim, not summaries. May slip to next Mon-Wed.
 
 ## 30-day kill criteria

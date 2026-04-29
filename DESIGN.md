@@ -22,9 +22,10 @@ Mode: Builder (vibe-shifted to startup-curious mid-session)
 
 - 周末 ship（约 18-22 小时实际工作时间，含 demo curation 2h）
 - 单人开发
-- **预算上限：第一个月 ≤ $50**（Polygon Starter $30 + Anthropic 用量 + 域名）。免费档优先，能省则省，但不强求"零成本"。第二个月起根据 30 天数据决定是否续。
+- **预算上限：第一个月 ≤ $50**。Feasibility check (2026-04-29) 后实际预算 = ~$20-30（数据源 $0 via yahoo-finance2，Anthropic ≤ $20，域名 ~$10/yr）。Polygon Starter ($30/mo) 退为 Plan B。
 - 必须能给 5 个具体朋友看 + 朋友能转发到群里
 - 不能要求用户注册账号、不能 sub-second 响应、不能拉历史回测
+- **新增（feasibility 后锁定）**：用户输入的 datetime 必须在 last 30 days 之内（yahoo-finance2 1-min 数据的硬上限）。前端表单 reject 更早的输入。
 
 ## Premises
 
@@ -86,23 +87,27 @@ A + 一个由用户编辑的"本周事件"流。Cron job + RSS/news API + 手动
 
 ### Approach A 技术细节
 
-**Stack:**
+**Stack（feasibility 后锁定）:**
 - Next.js 15 (App Router) + Vercel
 - Tailwind v4 + shadcn/ui
 - [Lightweight Charts](https://www.tradingview.com/lightweight-charts/) 渲染 K 线
-- 数据源（详见下方 Feasibility check）：**Polygon.io Starter $30/月**（兜底，确保有 1-min intraday）。Day 1 前 30 分钟先验证 yfinance / Alpha Vantage 免费档是否够用，不够直接付钱。
+- **数据源 + 新闻：`yahoo-finance2` (Node)** —— 一个承重依赖同时拿 1-min OHLC + 头条。免费、无需 API key、纯 Node 兼容 Vercel。完整 feasibility 数据见 `feasibility/VERDICT.md`。
 - Anthropic SDK，**Claude Sonnet 4.7**（最新版，cost/quality 平衡）
 - Vercel KV：仅缓存 permalink → result。**不缓存价格数据**（V1 流量小，每次现拉）
 - `@vercel/og` 生成 OG image：**V1 静态布局**（ticker + 大字 % 涨跌 + headline 文字），**不渲染 chart**（chart-in-OG 是 V2，Lightweight Charts 是运行时 canvas，SSR 复杂）
 
-**预算上限**：Anthropic + Polygon + 域名 **≤ $50 第一个月**。超了就停。**新闻数据源**：用 Polygon Starter 自带的 news endpoint（避免引入第二个承重依赖）；如果 Polygon news 覆盖不到，fallback 到 step 5 的 "no headlines found" 状态。
+**Plan B**：如果 yahoo-finance2 在周末因 Yahoo 改 endpoint / 反爬而 break，迁移到 Polygon Starter ($30/月) 是 ~2 小时的工作（schema 接近，重点改 fetch 函数 + news filter）。Plan B 触发即认可 $30/mo 持续支出。
+
+**新闻 fetch 细节**：`yahooFinance.search(ticker, { newsCount: 10, quotesCount: 0 })` 拿全局最新头条，应用层按 `providerPublishTime` 过滤到事件 ±N 小时（默认 N=4）。覆盖不到时走 step 5 的 "no headlines found" 状态，不阻塞。
+
+**预算上限**：Anthropic ($20/mo cap) + 域名 (~$10/yr) **≤ $30 第一个月**。第二个月看用量决定是否续。
 
 **核心数据流:**
-1. 用户输入 ticker + datetime（输入框 + datetime picker；非 US 票或盘前盘后直接前端 reject）
+1. 用户输入 ticker + datetime（输入框 + datetime picker；非 US 票、盘前盘后、**或超过 last 30 days** 都前端 reject）
 2. 后端规范化：ticker uppercase，时间 round 到 minute，存为 ET ISO
 3. 计算 hash：`sha1(ticker + rounded_minute_ET)`。先查 KV，命中直接返回（first-write-wins）
-4. 未命中则 fetch ±2h 1-min bars
-5. fetch 该时间窗口附近的新闻头条；**fetch 失败 → 走 "no headlines found" 状态**，不阻塞
+4. 未命中则 `yahooFinance.chart(ticker, { period1, period2, interval: "1m", includePrePost: false })`，**取回后客户端 filter 到 ±2h**（API 不严格 honor period2）
+5. `yahooFinance.search(ticker, { newsCount: 10, quotesCount: 0 })` 拿头条，按 `providerPublishTime` filter 到事件 ±4h；空结果 → 走 "no headlines found" 状态不阻塞
 6. Claude API 一次调用：返回 `{event_summary: string, bull_take: {claim: string, evidence: [{quote: string, source_url: string}]}, bear_take: same shape}`。Prompt 强制 LLM **只能引用真实头条**——没头条时返回 "insufficient news context, showing chart only"
 7. 渲染：chart（事件 vertical line = 用户输入的 timestamp，不让 LLM 改）+ 三段卡片 + **每页底部固定 disclaimer**："This is not financial advice. AI-generated interpretation may be incorrect. Verify before trading."
 8. 写 KV → 返回 permalink
@@ -121,10 +126,10 @@ A + 一个由用户编辑的"本周事件"流。Cron job + RSS/news API + 手动
 
 ## Open Questions
 
-1. **数据源 Feasibility check（Day 1 前 30 分钟必做）**：Polygon.io 免费档 = 5 calls/min + EOD only，**没有 1-min intraday**。Alpha Vantage 免费 = 25 req/day。yfinance 是非官方爬，违反 Yahoo ToS、不稳。**Plan A**：先试 yfinance 看能不能跑通——能跑接受 ToS 风险给周末用。**Plan B**：直接 Polygon Starter $30/月，预算认了。**这是整个项目的承重假设——验证不通过就停下来重新设计**。
+1. ~~**数据源 Feasibility check**~~ —— **RESOLVED 2026-04-29**：`yahoo-finance2` (Node) 可以同时拿 1-min OHLC 和真实新闻头条，30 天硬上限。完整测试见 `feasibility/VERDICT.md`。Plan B (Polygon Starter $30/mo) 文档化为 ~2h 迁移路径。
 2. **LLM 编造风险**（V1 接受的风险）：bull/bear 卡片靠 (a) prompt 强制只引真实头条 (b) 全站 disclaimer。V1 不做单独 fact-check pass。这是已接受的 V1 风险——通过 disclaimer 减伤，未来根据真实用户反馈决定要不要加 fact-check。
 3. **5 个朋友是谁**：用户还没明确告诉我具体名字。**这是用户访谈的前置条件**——周末第一件事写下 5 个具体名字。
-4. **Trump 是不是 launch demo**：用户还没决定 launch 时主推哪 3-5 个 demo replay。Trump 是个候选但**不一定最佳**——可能 NVDA earnings + FOMC + DeepSeek 那波下跌组合更好（不政治、更通用）。
+4. **Trump 是不是 launch demo**：用户还没决定 launch 时主推哪 3-5 个 demo replay。受 30-day 硬上限影响，DeepSeek selloff (Jan 2025) 候选已 drop。新候选池：最近一次 NVDA 财报反应、最近一次 FOMC 决议、最近一次 Trump 政策性 tweet/关税 + 几个由用户在 30 天窗口里挑选的"我那时也想看明白"事件。
 
 ## Success Criteria
 
@@ -152,12 +157,12 @@ A + 一个由用户编辑的"本周事件"流。Cron job + RSS/news API + 手动
 
 **这周（并行执行）:**
 
-1. **写代码**（重新分配后的更现实预算）:
-   - **Day 1 前 30 分钟**：Feasibility check——验证 yfinance 或免费档能否拉到 1-min intraday。不行直接付 Polygon Starter（$30/月）。**这一步不通过整个 design 重写**。
-   - **Day 1（~6h）**：Next.js skeleton + 输入框 UI + 数据 API 接通 + chart 渲染 + 基本 disclaimer
-   - **Day 2（~7h）**：Anthropic API 接通 + bull/bear prompt 迭代（防编造，约 2-3h）+ permalink 写入 KV + IP 限流
-   - **Day 3 上午（~3h）**：OG image（静态布局，无 chart）+ 部署 Vercel
-   - **Day 3 下午（~2h）**：手动 curate 5 个高质量 demo replay（候选：NVDA earnings、FOMC、DeepSeek 下跌、Trump 关税）+ 硬编码 footer 数组
+1. **写代码**（feasibility 后更新的预算）:
+   - ~~**Day 1 前 30 分钟**：Feasibility check~~ —— **DONE 2026-04-29**，结论 PASS with scope adjustment（last-30-days input limit）。详见 `feasibility/VERDICT.md`。
+   - **Day 1（~6h）**：Next.js 15 skeleton + shadcn/ui setup + 输入框 UI（含 30 天 datetime 上限）+ `/api/replay` route 调用 yahoo-finance2 + Lightweight Charts 渲染 + 全站 disclaimer footer
+   - **Day 2（~7h）**：Anthropic API 接通 + bull/bear prompt 迭代（防编造，2-3h）+ permalink 写入 KV + IP 限流（每 IP 每小时 ≤10 个新 replay）
+   - **Day 3 上午（~3h）**：`@vercel/og` 静态 OG image（无 chart）+ 部署 Vercel + 域名接通
+   - **Day 3 下午（~2h）**：手动 curate 5 个高质量 demo replay（**全部 ≤30 天**：最近一次 NVDA 财报、最近一次 FOMC、近期 Trump 关税/政策推文、+ 用户自己当下感兴趣的 1-2 个事件）+ 硬编码 footer 数组
 
 2. **聊 5 个朋友**:
    - 不带产品。问 1 个开放问题："上次你想看明白一个股价异动是什么时候？你当时实际做了什么？"

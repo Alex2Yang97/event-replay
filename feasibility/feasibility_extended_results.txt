@@ -1,0 +1,33 @@
+==============================================================================
+Stability test: 5 sequential 1-min fetches for NVDA
+==============================================================================
+  Attempt 1: 180 bars in 0.64s
+  Attempt 2: 180 bars in 0.01s
+  Attempt 3: 180 bars in 0.01s
+  Attempt 4: 180 bars in 0.01s
+  Attempt 5: 180 bars in 0.01s
+  avg=0.14s  min=0.01s  max=0.64s
+
+==============================================================================
+News coverage test: yfinance .news for NVDA
+==============================================================================
+  Returned 10 headlines in 0.31s
+  Schema (first item keys): ['id', 'content']
+
+  [1] Big Tech: What this strategist is looking for on earnings calls
+      Published: 2026-04-28T20:43:04Z  by: Yahoo Finance Video
+      URL: https://finance.yahoo.com/video/big-tech-what-this-strategist-is-looking-for-on-earnings-calls-204304094.html
+
+  [2] OpenAI miss sparks sell-off for Oracle, Nvidia, CoreWeave stocks
+      Published: 2026-04-28T17:24:14Z  by: Yahoo Finance Video
+      URL: https://finance.yahoo.com/video/openai-miss-sparks-sell-off-for-oracle-nvidia-coreweave-stocks-172414721.html
+
+  [3] The only number that matters for 'Magnificent 7' earnings this week: Morning Brief
+      Published: 2026-04-28T10:00:00Z  by: Yahoo Finance
+      URL: https://finance.yahoo.com/markets/article/the-only-number-that-matters-for-magnificent-7-earnings-this-week-morning-brief-100000837.html
+
+==============================================================================
+Pre-market behavior test: NVDA with prepost=False vs True
+==============================================================================
+  prepost=False: 150 bars [09:30 -> 11:59 ET]
+  prepost=True: 240 bars [08:00 -> 11:59 ET]
