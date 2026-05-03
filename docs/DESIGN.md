@@ -91,14 +91,15 @@ A + 一个由用户编辑的"本周事件"流。Cron job + RSS/news API + 手动
 - Next.js 15 (App Router) + Vercel
 - Tailwind v4 + shadcn/ui
 - [Lightweight Charts](https://www.tradingview.com/lightweight-charts/) 渲染 K 线
-- **数据源 + 新闻：`yahoo-finance2` (Node)** —— 一个承重依赖同时拿 1-min OHLC + 头条。免费、无需 API key、纯 Node 兼容 Vercel。完整 feasibility 数据见 `feasibility/VERDICT.md`。
+- **价格数据：`yahoo-finance2` (Node)** —— 1-min OHLC，免费、无需 API key。完整 feasibility 数据见 `feasibility/VERDICT.md`。
+- **新闻：Finnhub `/company-news`** —— 支持按 `from`/`to` 日期精确查历史新闻（Yahoo `search` 只返回"最新"，对历史事件不可用，2026-05-02 踩坑后切换）。免费 tier 60 req/min 足够 V1。Feasibility 数据见 `feasibility/finnhub-test/finnhub_results.txt`。
 - Anthropic SDK，**Claude Sonnet 4.7**（最新版，cost/quality 平衡）
 - Vercel KV：仅缓存 permalink → result。**不缓存价格数据**（V1 流量小，每次现拉）
 - `@vercel/og` 生成 OG image：**V1 静态布局**（ticker + 大字 % 涨跌 + headline 文字），**不渲染 chart**（chart-in-OG 是 V2，Lightweight Charts 是运行时 canvas，SSR 复杂）
 
 **Plan B**：如果 yahoo-finance2 在周末因 Yahoo 改 endpoint / 反爬而 break，迁移到 Polygon Starter ($30/月) 是 ~2 小时的工作（schema 接近，重点改 fetch 函数 + news filter）。Plan B 触发即认可 $30/mo 持续支出。
 
-**新闻 fetch 细节**：`yahooFinance.search(ticker, { newsCount: 10, quotesCount: 0 })` 拿全局最新头条，应用层按 `providerPublishTime` 过滤到事件 ±N 小时（默认 N=4）。覆盖不到时走 step 5 的 "no headlines found" 状态，不阻塞。
+**新闻 fetch 细节**：`GET https://finnhub.io/api/v1/company-news?symbol=X&from=YYYY-MM-DD&to=YYYY-MM-DD&token=$FINNHUB_API_KEY`（event 日期 ±1 天做 `from`/`to` 保证边界），应用层再按 `datetime` 过滤到事件 ±N 小时（默认 N=4）。API key 通过 `FINNHUB_API_KEY` 环境变量注入。覆盖不到时走 step 5 的 "no headlines found" 状态，不阻塞。
 
 **预算上限**：Anthropic ($20/mo cap) + 域名 (~$10/yr) **≤ $30 第一个月**。第二个月看用量决定是否续。
 
@@ -107,7 +108,7 @@ A + 一个由用户编辑的"本周事件"流。Cron job + RSS/news API + 手动
 2. 后端规范化：ticker uppercase，时间 round 到 minute，存为 ET ISO
 3. 计算 hash：`sha1(ticker + rounded_minute_ET)`。先查 KV，命中直接返回（first-write-wins）
 4. 未命中则 `yahooFinance.chart(ticker, { period1, period2, interval: "1m", includePrePost: false })`，**取回后客户端 filter 到 ±2h**（API 不严格 honor period2）
-5. `yahooFinance.search(ticker, { newsCount: 10, quotesCount: 0 })` 拿头条，按 `providerPublishTime` filter 到事件 ±4h；空结果 → 走 "no headlines found" 状态不阻塞
+5. Finnhub `company-news?symbol=X&from=D-1&to=D+1` 拿头条，按 `datetime` filter 到事件 ±4h；空结果 → 走 "no headlines found" 状态不阻塞
 6. Claude API 一次调用：返回 `{event_summary: string, bull_take: {claim: string, evidence: [{quote: string, source_url: string}]}, bear_take: same shape}`。Prompt 强制 LLM **只能引用真实头条**——没头条时返回 "insufficient news context, showing chart only"
 7. 渲染：chart（事件 vertical line = 用户输入的 timestamp，不让 LLM 改）+ 三段卡片 + **每页底部固定 disclaimer**："This is not financial advice. AI-generated interpretation may be incorrect. Verify before trading."
 8. 写 KV → 返回 permalink

@@ -44,7 +44,8 @@ The core insight: TipRanks/Bloomberg/TradingView already win on dashboards. Nobo
 - Next.js 15 App Router on Vercel
 - Tailwind v4 + shadcn/ui
 - Lightweight Charts (TradingView OSS) for K-line rendering
-- **`yahoo-finance2` (Node)** for both 1-min OHLC AND news headlines — single load-bearing dep, free, no API key. Plan B if it breaks: Polygon Starter ($30/mo, ~2h migration)
+- **`yahoo-finance2` (Node)** for 1-min OHLC — free, no API key. Plan B if it breaks: Polygon Starter ($30/mo, ~2h migration)
+- **Finnhub `/company-news`** for historical news headlines (Yahoo `search` returns "latest only" and can't be date-filtered — confirmed 2026-05-02). Free tier 60 req/min. Key in `FINNHUB_API_KEY` env var
 - Anthropic SDK, Claude Sonnet 4.7
 - Vercel KV for permalink storage (no price caching in V1)
 - `@vercel/og` for static OG images

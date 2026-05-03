@@ -4,7 +4,7 @@ import { ReplayChart } from "@/components/replay-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { decodeReplayId } from "@/lib/replay-id";
 import { formatEtIso } from "@/lib/time";
-import { fetchReplayData } from "@/lib/yahoo";
+import { fetchReplayData } from "@/lib/replay-data";
 
 export const dynamic = "force-dynamic";
 

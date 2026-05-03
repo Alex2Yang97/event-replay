@@ -10,7 +10,7 @@ import {
   type IChartApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import type { Bar } from "@/lib/yahoo";
+import type { Bar } from "@/lib/replay-data";
 
 type Props = {
   bars: Bar[];
