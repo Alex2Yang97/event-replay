@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { Fragment } from "react";
 import type { Metadata } from "next";
 import { ReplayChart } from "@/components/replay-chart";
+import { ShareLink } from "@/components/share-link";
+import { DemoStrip } from "@/components/demo-strip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { decodeReplayId } from "@/lib/replay-id";
 import { formatEtIso } from "@/lib/time";
@@ -116,10 +118,11 @@ export default async function ReplayPage({
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12 space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <Link href="/" className="text-sm text-muted-foreground underline">
           ← new replay
         </Link>
+        <ShareLink />
       </div>
 
       <header className="space-y-1">
@@ -219,9 +222,9 @@ export default async function ReplayPage({
         </Card>
       )}
 
-      <p className="text-xs text-muted-foreground text-center pt-4 border-t">
-        This is not financial advice. AI-generated interpretation may be incorrect. Verify before trading.
-      </p>
+      <div className="pt-4 border-t">
+        <DemoStrip heading="Try another replay →" />
+      </div>
     </div>
   );
 }
