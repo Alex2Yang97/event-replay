@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { decodeReplayId } from "@/lib/replay-id";
 import { formatEtIso } from "@/lib/time";
 import { fetchReplayData } from "@/lib/replay-data";
+import { analyzeReplay, type ReplayAnalysis } from "@/lib/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,22 @@ export default async function ReplayPage({
     firstBar && lastBar
       ? ((lastBar.close - firstBar.open) / firstBar.open) * 100
       : null;
+
+  let analysis: ReplayAnalysis | null = null;
+  let analysisError: string | null = null;
+  try {
+    analysis = await analyzeReplay({
+      ticker,
+      eventTime: data.eventTime,
+      pctMove,
+      firstOpen: firstBar?.open ?? null,
+      lastClose: lastBar?.close ?? null,
+      headlines: data.headlines,
+    });
+  } catch (err) {
+    analysisError = err instanceof Error ? err.message : "LLM call failed.";
+    console.warn("analyzeReplay failed:", err);
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12 space-y-8">
@@ -114,14 +131,80 @@ export default async function ReplayPage({
         </CardContent>
       </Card>
 
-      <Card className="bg-muted/30 border-dashed">
-        <CardHeader>
-          <CardTitle className="text-base">Bull vs. bear</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Bull/bear LLM card ships Day 2 (Anthropic API + source-cited prompt).
-        </CardContent>
-      </Card>
+      {analysis ? (
+        <div className="space-y-4">
+          {analysis.event_summary && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">What likely moved it</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm">
+                {analysis.event_summary}
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <TakeCard label="Bull" tone="bull" take={analysis.bull_take} />
+            <TakeCard label="Bear" tone="bear" take={analysis.bear_take} />
+          </div>
+        </div>
+      ) : (
+        <Card className="bg-muted/30 border-dashed">
+          <CardHeader>
+            <CardTitle className="text-base">Bull vs. bear</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {analysisError
+              ? `Analysis unavailable: ${analysisError}`
+              : "Analysis unavailable (OPENAI_API_KEY not set)."}
+          </CardContent>
+        </Card>
+      )}
+
+      <p className="text-xs text-muted-foreground text-center pt-4 border-t">
+        This is not financial advice. AI-generated interpretation may be incorrect. Verify before trading.
+      </p>
     </div>
+  );
+}
+
+function TakeCard({
+  label,
+  tone,
+  take,
+}: {
+  label: string;
+  tone: "bull" | "bear";
+  take: ReplayAnalysis["bull_take"];
+}) {
+  const toneClass = tone === "bull" ? "text-green-700" : "text-red-700";
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className={`text-base ${toneClass}`}>{label}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p>{take.claim}</p>
+        {take.evidence.length > 0 && (
+          <ul className="space-y-2 border-l-2 border-muted pl-3">
+            {take.evidence.map((e, i) => (
+              <li key={i} className="text-xs text-muted-foreground">
+                <span className="italic">“{e.quote}”</span>
+                {" "}
+                <a
+                  href={e.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  source
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
