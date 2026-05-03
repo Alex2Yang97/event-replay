@@ -1,6 +1,6 @@
 # Session Handoff — 2026-04-27 office hours
 
-A new Claude session reading this should also read `CLAUDE.md` and `DESIGN.md` in this folder.
+A new Claude session reading this should also read `../CLAUDE.md` and `DESIGN.md` in this folder.
 
 This file captures **the conversation that produced the design doc** — pivots, decisions, and what was settled vs still open. The reasoning is here; the spec is in `DESIGN.md`.
 

@@ -10,7 +10,7 @@ The core insight: TipRanks/Bloomberg/TradingView already win on dashboards. Nobo
 
 ## Source of truth
 
-**`DESIGN.md`** is the full design doc. Read it first. It includes:
+**`docs/DESIGN.md`** is the full design doc. Read it first. It includes:
 - Problem statement + target user
 - 5 agreed premises (Premise 4 was revised after a cold-read challenge)
 - Approaches A/B/C considered, **Approach A selected**
@@ -18,7 +18,7 @@ The core insight: TipRanks/Bloomberg/TradingView already win on dashboards. Nobo
 - Open questions, success criteria, distribution plan, weekend timeline
 - A "What I noticed about how you think" section with founder-signal observations
 
-**`HANDOFF.md`** has the conversation summary + key pivots + the hard-won decisions (why this and not that). Read it second.
+**`docs/HANDOFF.md`** has the conversation summary + key pivots + the hard-won decisions (why this and not that). Read it second.
 
 ## What's in scope for V1 (the weekend MVP)
 
@@ -72,7 +72,7 @@ Hard fail: ≥3 friends never come back → event-replay hypothesis is wrong, re
 
 ## The key decisions you should NOT casually overturn
 
-These were hard-won in the previous session. If a fresh session wants to change one, re-read HANDOFF.md to see why it was settled this way.
+These were hard-won in the previous session. If a fresh session wants to change one, re-read `docs/HANDOFF.md` to see why it was settled this way.
 
 1. **Trump tracker is just demo content, not the moat** — TipRanks already does Trump-specific. Don't pivot back.
 2. **Visualization is table stakes, not differentiation** — moat is the share artifact + editorial curation. Don't slide back into "just make pretty charts."

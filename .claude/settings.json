@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(npx tsc *)",
+      "Bash(npx --yes shadcn@latest *)",
+      "Bash(node *)",
+      "Bash(curl *)",
+      "Skill(browse)"
+    ]
+  }
+}
