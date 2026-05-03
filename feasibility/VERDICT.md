@@ -1,15 +1,16 @@
-# Feasibility Verdict — 2026-04-29
+# Feasibility Verdict — 2026-04-29 (news source revised 2026-05-02)
 
 Status: **PASS with scope adjustment**
 
 ## Summary
 
-yfinance can deliver everything V1 needs **for free**, with one constraint: the input UI must restrict timestamps to the last 30 days. The `.news` attribute also returns real headlines (title, publisher, timestamp, URL), which means we can drop Polygon from V1 entirely.
+`yahoo-finance2` (Node) can deliver 1-min OHLC **for free** with one constraint: the input UI must restrict timestamps to the last 30 days.
 
-This is **better** than the path proposed in `DESIGN.md`:
-- $30/mo budget freed up for more Anthropic headroom
-- One load-bearing dependency instead of two (yfinance for both price + news)
-- Faster Day 1: no Polygon API-key signup, no second SDK to learn
+News source was **revised from Yahoo `.search` to Finnhub `/company-news`** on 2026-05-02 — Yahoo's search endpoint returns a global "latest" feed that can't be filtered to a historical date, so it's unusable for event-windowed replays. Finnhub's free tier (60 req/min) supports `from=/to=` date filtering and covers ≥30-day-old events with <400ms latency. See "Finnhub follow-up" section below.
+
+Budget still ~$20/mo (Anthropic cap), unchanged. Supporting scripts retained:
+- `node-test/check_node.mjs` — price feasibility probe (yahoo-finance2)
+- `finnhub-test/check_finnhub.mjs` — news feasibility probe (Finnhub)
 
 ## Evidence
 
@@ -36,7 +37,7 @@ Attempt 2-5: 180 bars in 0.01s each (yfinance request-caches by default)
 
 No rate-limit failures. Cold queries finish well under the 2s budget.
 
-### Test 3 — News endpoint (the surprise win)
+### Test 3 — Yahoo news endpoint (SUPERSEDED 2026-05-02 — see Finnhub follow-up)
 
 ```
 Returned 10 headlines in 0.31s
@@ -77,7 +78,7 @@ Recommendation: accept truncation. The chart will just start at 09:30 for early-
 
 1. **Data source for V1**: `yahoo-finance2` (Node) only. No Polygon, no Python sidecar.
 2. **Input UI constraint**: datetime picker max = today, min = today minus 30 days. Reject older inputs at the form level with a clear message.
-3. **News source for V1**: `yahooFinance.search(ticker, { newsCount: 10, quotesCount: 0 })` filtered to ±N hours of event timestamp. N defaults to 4.
+3. **News source for V1**: Finnhub `/company-news?symbol=X&from=YYYY-MM-DD&to=YYYY-MM-DD` then filter client-side to ±N hours of event timestamp. N defaults to 4. Free tier 60 req/min. Key in `FINNHUB_API_KEY` env var. (Revised 2026-05-02 from Yahoo `.search` — see Finnhub follow-up section.)
 4. **Demo replay candidates** (must all be within last 30 days):
    - NVDA recent post-earnings move (last quarterly earnings was within 30 days)
    - Most recent FOMC decision (FOMC meets ~8x/yr)
@@ -91,7 +92,7 @@ Recommendation: accept truncation. The chart will just start at 09:30 for early-
 Day 1 can start immediately on:
 - Next.js 15 skeleton + shadcn/ui
 - Input form (ticker + datetime, with the 30-day constraint baked in)
-- A `/api/replay` route that calls yfinance via a Python sidecar (or finds a Node equivalent — see Open Question below)
+- A `/api/replay` route that calls `yahoo-finance2` for bars and Finnhub for news
 - Lightweight Charts rendering
 
 ## Bridge decision — RESOLVED
@@ -113,4 +114,22 @@ One quirk to handle: `chart({period1, period2})` does not strictly honor `period
 
 API surface to use:
 - Bars: `yahooFinance.chart(ticker, { period1, period2, interval: "1m", includePrePost: false })`
-- News: `yahooFinance.search(ticker, { newsCount: 10, quotesCount: 0 })` then filter by `providerPublishTime` to ±N hours of event timestamp.
+- News: Finnhub `GET /api/v1/company-news?symbol=X&from=YYYY-MM-DD&to=YYYY-MM-DD&token=$FINNHUB_API_KEY` then filter by `datetime` (unix seconds) to ±N hours of event timestamp.
+
+## Finnhub follow-up — 2026-05-02
+
+Yahoo's `search(ticker, { newsCount })` only returns the current "latest" feed for a ticker — there's no `from`/`to` parameter, and results are not pinned to any historical date. For an event-replay product where a shared permalink is generated days later, this means the headlines next to the chart would not be the headlines *around the event* — they'd be whatever is trending that week. Unusable.
+
+Finnhub's `/company-news` endpoint accepts explicit `from` and `to` dates. Probed 5 tickers across the 30-day window (see `finnhub-test/check_finnhub.mjs`):
+
+| Case | Latency | Items returned | In ±4h window |
+|---|---|---|---|
+| AAPL 3 days ago | 377ms | 245 | 47 |
+| NVDA 7 days ago | 77ms | 249 | 102 |
+| TSLA 14 days ago | 53ms | 210 | 39 |
+| SPY 30 days ago | 49ms | 106 | 13 |
+| MSFT 60 days ago | 152ms | 204 | 25 |
+
+Fields returned: `category, datetime, headline, id, image, related, source, summary, url`. All fields the bull/bear prompt needs (title = `headline`, publisher = `source`, timestamp = `datetime`, link = `url`, plus `summary` as a bonus).
+
+Coverage extends well past the 30-day price cliff (MSFT 60d returned 204 items), so if we ever loosen the UI constraint via a different price source, news won't be the bottleneck.
