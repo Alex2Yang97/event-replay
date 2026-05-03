@@ -28,6 +28,7 @@ export function ReplayChart({ bars, eventTime }: Props) {
       layout: {
         background: { type: ColorType.Solid, color: "rgba(0,0,0,0)" },
         textColor: "#71717a",
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: "rgba(128,128,128,0.15)" },
@@ -35,7 +36,14 @@ export function ReplayChart({ bars, eventTime }: Props) {
       },
       crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
+      timeScale: {
+        borderVisible: false,
+        timeVisible: true,
+        secondsVisible: false,
+        fixLeftEdge: true,
+        fixRightEdge: true,
+        lockVisibleTimeRangeOnResize: true,
+      },
       autoSize: true,
     });
 
@@ -68,15 +76,30 @@ export function ReplayChart({ bars, eventTime }: Props) {
     );
 
     if (nearest) {
+      const eventLabel = new Date(eventTime).toLocaleTimeString("en-US", {
+        timeZone: "America/New_York",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
       createSeriesMarkers(series, [
         {
           time: nearest.time,
           position: "aboveBar",
           color: "#2563eb",
           shape: "arrowDown",
-          text: "event",
+          text: `event · ${eventLabel} ET`,
+          size: 2,
         },
       ]);
+      series.createPriceLine({
+        price: nearest.close,
+        color: "#2563eb",
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: false,
+        title: "event",
+      });
     }
 
     chart.timeScale().fitContent();

@@ -1,4 +1,5 @@
 import { ReplayForm } from "@/components/replay-form";
+import { DemoStrip } from "@/components/demo-strip";
 
 export default function Home() {
   return (
@@ -20,6 +21,8 @@ export default function Home() {
         <p className="text-xs text-muted-foreground text-center sm:text-left">
           US equities only · regular hours (09:30–16:00 ET) · last 30 days only
         </p>
+
+        <DemoStrip />
       </div>
     </div>
   );
