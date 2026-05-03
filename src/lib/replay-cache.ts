@@ -1,6 +1,7 @@
 import { fetchReplayData, type Bar, type Headline } from "@/lib/replay-data";
 import { analyzeReplay, type ReplayAnalysis } from "@/lib/llm";
 import { kvGet, kvSetNx } from "@/lib/kv";
+import { checkReplayRateLimit } from "@/lib/rate-limit";
 
 export type CachedReplay = {
   ticker: string;
@@ -16,7 +17,7 @@ export type CachedReplay = {
 
 export type LoadReplayResult =
   | { ok: true; data: CachedReplay; fromCache: boolean }
-  | { ok: false; error: string };
+  | { ok: false; error: string; reason?: "rate_limited" | "fetch_failed"; resetAt?: number };
 
 const CACHE_TTL_SECONDS = 60 * 60 * 24 * 90;
 
@@ -44,7 +45,8 @@ function computeMove(bars: Bar[]): {
 export async function loadReplay(
   id: string,
   ticker: string,
-  timestamp: string
+  timestamp: string,
+  opts: { clientIp?: string | null } = {}
 ): Promise<LoadReplayResult> {
   const key = cacheKey(id);
 
@@ -53,12 +55,26 @@ export async function loadReplay(
     return { ok: true, data: cached, fromCache: true };
   }
 
+  // Cache miss → this request will spend an LLM call. Gate it.
+  if (opts.clientIp) {
+    const rl = await checkReplayRateLimit(opts.clientIp);
+    if (!rl.allowed) {
+      return {
+        ok: false,
+        reason: "rate_limited",
+        resetAt: rl.resetAt,
+        error: "Rate limit reached (10 new replays per hour per IP). Try an existing permalink, or try again later.",
+      };
+    }
+  }
+
   let data;
   try {
     data = await fetchReplayData(ticker, timestamp);
   } catch (err) {
     return {
       ok: false,
+      reason: "fetch_failed",
       error: err instanceof Error ? err.message : "Unknown error.",
     };
   }

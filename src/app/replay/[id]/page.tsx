@@ -1,13 +1,59 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment } from "react";
+import type { Metadata } from "next";
 import { ReplayChart } from "@/components/replay-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { decodeReplayId } from "@/lib/replay-id";
 import { formatEtIso } from "@/lib/time";
 import { loadReplay } from "@/lib/replay-cache";
+import { getClientIp } from "@/lib/client-ip";
 import type { Headline } from "@/lib/replay-data";
 import type { ReplayAnalysis, Relevance } from "@/lib/llm";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const decoded = decodeReplayId(id);
+  if (!decoded) return { title: "Event Replay" };
+
+  const { ticker, timestamp } = decoded;
+  const eventDate = new Date(timestamp);
+  const when = formatEtIso(eventDate);
+  const result = await loadReplay(id, ticker, timestamp);
+
+  const title = `${ticker} · ${when}`;
+  let description = `Intraday price replay for ${ticker} at ${when}, with nearby headlines and a bull vs. bear take.`;
+
+  if (result.ok) {
+    const { pctMove, analysis } = result.data;
+    if (pctMove != null) {
+      const sign = pctMove >= 0 ? "+" : "";
+      description = `${ticker} ${sign}${pctMove.toFixed(2)}% across ±2h at ${when}.`;
+      if (analysis?.event_summary && analysis.has_sufficient_context) {
+        description += ` ${analysis.event_summary}`;
+      }
+    }
+  }
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "article",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
 
 export default async function ReplayPage({
   params,
@@ -21,9 +67,15 @@ export default async function ReplayPage({
   const { ticker, timestamp } = decoded;
   const eventDate = new Date(timestamp);
 
-  const result = await loadReplay(id, ticker, timestamp);
+  const clientIp = await getClientIp();
+  const result = await loadReplay(id, ticker, timestamp, { clientIp });
 
   if (!result.ok) {
+    const isRateLimit = result.reason === "rate_limited";
+    const resetLine =
+      isRateLimit && result.resetAt
+        ? `Try again after ${new Date(result.resetAt).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" })} ET.`
+        : null;
     return (
       <div className="max-w-3xl mx-auto px-6 py-16 space-y-6">
         <Link href="/" className="text-sm text-muted-foreground underline">
@@ -31,11 +83,14 @@ export default async function ReplayPage({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Couldn&apos;t fetch data</CardTitle>
+            <CardTitle>
+              {isRateLimit ? "Too many new replays" : "Couldn’t fetch data"}
+            </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
+          <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>{ticker} at {formatEtIso(eventDate)}</p>
-            <p className="mt-2">{result.error}</p>
+            <p>{result.error}</p>
+            {resetLine && <p>{resetLine}</p>}
           </CardContent>
         </Card>
       </div>

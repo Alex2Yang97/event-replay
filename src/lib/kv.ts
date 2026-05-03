@@ -12,6 +12,10 @@ function getClient(): Redis | null {
   return client;
 }
 
+export function getRedis(): Redis | null {
+  return getClient();
+}
+
 export async function kvGet<T>(key: string): Promise<T | null> {
   const c = getClient();
   if (!c) return null;
