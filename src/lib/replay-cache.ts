@@ -2,6 +2,7 @@ import { fetchReplayData, type Bar, type Headline } from "@/lib/replay-data";
 import { analyzeReplay, type ReplayAnalysis } from "@/lib/llm";
 import { kvGet, kvSetNx } from "@/lib/kv";
 import { checkReplayRateLimit } from "@/lib/rate-limit";
+import { getDemoSnapshot } from "@/lib/demo-snapshots";
 
 export type CachedReplay = {
   ticker: string;
@@ -48,6 +49,25 @@ export async function loadReplay(
   timestamp: string,
   opts: { clientIp?: string | null } = {}
 ): Promise<LoadReplayResult> {
+  const snap = getDemoSnapshot(id);
+  if (snap) {
+    return {
+      ok: true,
+      fromCache: true,
+      data: {
+        ticker: snap.ticker,
+        eventTime: snap.eventTime,
+        bars: snap.bars,
+        headlines: snap.headlines,
+        pctMove: snap.pctMove,
+        firstOpen: snap.firstOpen,
+        lastClose: snap.lastClose,
+        analysis: snap.analysis,
+        analysisError: snap.analysisError,
+      },
+    };
+  }
+
   const key = cacheKey(id);
 
   const cached = await kvGet<CachedReplay>(key);
